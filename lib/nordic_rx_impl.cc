@@ -117,15 +117,40 @@ namespace gr {
               memcpy(&buffer[sizeof(nordictap_header) + m_address_length], m_enhanced_shockburst->payload(), header.payload_length);
               memcpy(&buffer[sizeof(nordictap_header) + m_address_length + header.payload_length], m_enhanced_shockburst->crc(), m_crc_length);
 
-              // Send the packet to wireshark
-              boost::asio::io_service io_service;
-              boost::asio::ip::udp::resolver resolver(io_service);
-              boost::asio::ip::udp::resolver::query query(boost::asio::ip::udp::v4(), "127.0.0.1", "9451");
-              boost::asio::ip::udp::endpoint receiver_endpoint = *resolver.resolve(query);
-              boost::asio::ip::udp::socket socket(io_service);
-              socket.open(boost::asio::ip::udp::v4());
-              socket.send_to(boost::asio::buffer(buffer, buffer_length), receiver_endpoint);
+              /* Youri Klaassens: This only works with older version of Boost library */ 
 
+              // Send the packet to wireshark
+              //boost::asio::io_context io_service;
+              //boost::asio::ip::udp::resolver resolver(io_service);
+              //boost::asio::ip::udp::resolver::query query(boost::asio::ip::udp::v4(), "127.0.0.1", "9451");
+              //boost::asio::ip::udp::endpoint receiver_endpoint = *resolver.resolve(query);
+              //boost::asio::ip::udp::socket socket(io_service);
+              //socket.open(boost::asio::ip::udp::v4());
+              //socket.send_to(boost::asio::buffer(buffer, buffer_length), receiver_endpoint);
+
+              // Send the packet to nordictap_out
+              //message_port_pub(pmt::intern("nordictap_out"), pmt::init_u8vector(buffer_length, buffer));
+
+              /* Youri Klaassens: New implementation using newer Boost library */
+
+              // Create io_context, resolver, and socket
+              static boost::asio::io_context io_context;
+              static boost::asio::ip::udp::resolver resolver(io_context);
+              static boost::asio::ip::udp::socket socket(io_context);
+              
+              // Resolve endpoint only once
+              static boost::asio::ip::udp::endpoint receiver_endpoint = 
+                  *resolver.resolve(boost::asio::ip::udp::v4(), "127.0.0.1", "9451").begin();
+              
+              // Open socket only once
+              if (!socket.is_open()) 
+              {
+                  socket.open(boost::asio::ip::udp::v4());
+              }
+              
+              // Send the packet to Wireshark
+              socket.send_to(boost::asio::buffer(buffer, buffer_length), receiver_endpoint);
+              
               // Send the packet to nordictap_out
               message_port_pub(pmt::intern("nordictap_out"), pmt::init_u8vector(buffer_length, buffer));
 
